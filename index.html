@@ -4,23 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Stream Room</title>
-    <!-- ИСПОЛЬЗУЕМ РАБОЧИЙ СЕРВЕР PEERPROXY ВМЕСТО PEEKJS.COM -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         body { background: #0f0f0f; color: white; height: 100vh; overflow: hidden; }
 
         /* --- СТРИМЕР --- */
-        #hostUI { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #1a1a1d; }
-        .host-panel { background: #000; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #333; max-width: 500px; width: 90%; }
+        #hostUI { display: flex; align-items: center; justify-content: center; height: 100%; background: #1a1a1d; gap: 30px; padding: 20px; }
+        
+        .host-panel { background: #000; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #333; width: 400px; flex-shrink: 0; }
         .btn-start { background: #e91e63; color: white; border: none; padding: 16px 32px; font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; transition: 0.2s; }
         .btn-start:hover { background: #c2185b; }
         .btn-start:disabled { background: #555; cursor: not-allowed; }
         
-        .link-box { margin-top: 20px; padding: 15px; background: #1f1f23; border-radius: 8px; word-break: break-all; color: #4ade80; font-family: monospace; display: none; border: 1px solid #4ade80; font-size: 14px; }
+        .link-box { margin-top: 20px; padding: 15px; background: #1f1f23; border-radius: 8px; word-break: break-all; color: #4ade80; font-family: monospace; display: none; border: 1px solid #4ade80; font-size: 13px; }
         .kick-btn { margin-top: 15px; background: #ff3333; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; width: 100%; }
         .kick-btn:hover { background: #cc0000; }
         .status-text { margin-top: 10px; color: #888; font-size: 13px; min-height: 20px; }
+
+        /* НОВОЕ: ОКНО ПРЕДПРОСМОТРА ДЛЯ СТРИМЕРА */
+        .preview-container { 
+            width: 500px; aspect-ratio: 16/9; background: #000; 
+            border-radius: 12px; overflow: hidden; border: 2px solid #333; 
+            position: relative; display: none; /* Скрыто до старта */
+            box-shadow: 0 0 30px rgba(233, 30, 99, 0.1);
+        }
+        .preview-container video { width: 100%; height: 100%; object-fit: cover; }
+        .preview-label { 
+            position: absolute; top: 10px; left: 10px; 
+            background: rgba(0,0,0,0.7); padding: 4px 10px; 
+            border-radius: 4px; font-size: 12px; font-weight: bold; color: #aaa;
+        }
 
         /* --- ЗРИТЕЛЬ --- */
         #viewerUI { display: none; height: 100vh; flex-direction: row; }
@@ -53,11 +67,17 @@
     <div id="hostUI">
         <div class="host-panel">
             <h2 style="margin-bottom:10px;">🎥 Приватная комната</h2>
-            <p style="color:#aaa;font-size:14px; margin-bottom: 20px;">Нажми кнопку, выбери OBS Virtual Camera и отправь ссылку гостю.</p>
+            <p style="color:#aaa;font-size:14px; margin-bottom: 20px;">Нажми кнопку, выбери OBS Virtual Camera. Ты увидишь превью слева.</p>
             <button class="btn-start" id="startBtn" onclick="startStream()">▶ Начать эфир</button>
             <div class="status-text" id="statusText"></div>
             <div class="link-box" id="streamLink"></div>
             <button class="kick-btn" id="kickBtn" onclick="kickViewer()">⛔ Кикнуть зрителя</button>
+        </div>
+
+        <!-- НОВОЕ: ТВОЕ ЛОКАЛЬНОЕ ПРЕВЬЮ -->
+        <div class="preview-container" id="localPreview">
+            <div class="preview-label">👁 ТВОЙ ЭФИР (LOCAL)</div>
+            <video id="localVideo" autoplay playsinline muted></video>
         </div>
     </div>
 
@@ -127,17 +147,23 @@ addMsg();
 async function startStream() {
     const btn = document.getElementById('startBtn');
     const status = document.getElementById('statusText');
+    const preview = document.getElementById('localPreview');
     
     btn.disabled = true;
-    btn.innerText = '⏳ Подключение к серверу...';
-    status.innerText = 'Инициализация PeerJS...';
+    btn.innerText = '⏳ Запуск...';
+    status.innerText = 'Захват камеры...';
 
     try {
-        // 1. Сначала получаем камеру
+        // 1. Получаем поток
         const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
         
-        // 2. Инициализируем Peer с ЯВНЫМ указанием рабочего сервера
-        // Используем peerproxy.app как альтернативу упавшему 0.peerjs.com
+        // 2. ПОКАЗЫВАЕМ ЕГО ТЕБЕ В ПРЕВЬЮ
+        document.getElementById('localVideo').srcObject = stream;
+        preview.style.display = 'block'; // Делаем окно видимым
+        
+        status.innerText = 'Камера активна. Подключение к сети...';
+
+        // 3. Инициализируем Peer
         peer = new Peer(null, {
             debug: 2,
             config: {
@@ -156,7 +182,7 @@ async function startStream() {
             
             btn.innerText = '✅ Эфир активен!';
             btn.style.background = '#2e7d32';
-            status.innerText = 'Скопируйте ссылку выше и отправьте гостю.';
+            status.innerText = 'Скопируйте ссылку выше.';
             document.getElementById('kickBtn').style.display = 'block';
             
             peer.on('connection', conn => {
@@ -169,14 +195,14 @@ async function startStream() {
                 
                 conn.on('close', () => { 
                     currentConn = null; 
-                    status.innerText = 'Ожидание подключения зрителя...';
+                    status.innerText = 'Ожидание подключения...';
                 });
             });
         });
 
         peer.on('error', err => {
             console.error(err);
-            status.innerText = '❌ Ошибка сервера: ' + err.type;
+            status.innerText = '❌ Ошибка сети: ' + err.type;
             btn.disabled = false;
             btn.innerText = '▶ Попробовать снова';
         });
@@ -185,6 +211,7 @@ async function startStream() {
         alert('Ошибка доступа к камере! Убедись, что OBS Virtual Camera запущена.');
         btn.disabled = false;
         btn.innerText = '▶ Начать эфир';
+        status.innerText = '';
     }
 }
 

@@ -13,6 +13,7 @@
             --tg-accent: #5288c1;
             --tg-red: #e53935;
             --tg-btn: #2ea6da;
+            --tg-input: #0e1621;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif; }
@@ -44,10 +45,9 @@
             height: 100%;
             border: none;
             object-fit: cover;
-            display: none; /* Скрыт до нажатия кнопки */
+            display: none;
         }
 
-        /* Заглушка с кнопкой старта */
         .start-overlay {
             position: absolute; inset: 0;
             background: rgba(23, 33, 43, 0.85);
@@ -68,10 +68,10 @@
         .start-btn:active { transform: scale(0.96); }
         .start-hint { margin-top: 12px; color: var(--tg-hint); font-size: 13px; }
 
-        /* Оверлеи поверх видео */
         .overlay {
             position: absolute; top: 16px; left: 16px;
             display: flex; gap: 8px; pointer-events: none; z-index: 10;
+            opacity: 0.3; transition: opacity 0.3s;
         }
         .badge {
             padding: 4px 10px; border-radius: 6px;
@@ -81,7 +81,6 @@
         .live-badge { background: var(--tg-red); color: white; }
         .viewers-badge { background: rgba(0,0,0,0.6); color: white; display: flex; align-items: center; gap: 4px;}
 
-        /* Кнопка кика для стримера */
         .kick-btn {
             position: absolute; bottom: 16px; left: 16px;
             background: var(--tg-red); color: white;
@@ -91,7 +90,6 @@
             display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        /* Экран окончания эфира */
         .ended-screen {
             display: none; position: absolute; inset: 0;
             background: rgba(23, 33, 43, 0.95);
@@ -119,10 +117,32 @@
             display: flex; flex-direction: column; gap: 8px;
             -webkit-overflow-scrolling: touch;
         }
-        .msg { font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg { font-size: 14px; line-height: 1.4; word-wrap: break-word; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         .name { font-weight: 600; margin-right: 4px; }
         .c1{color:#e17076} .c2{color:#7bc862} .c3{color:#6ec9cb} 
         .c4{color:#e5ca77} .c5{color:#65aadd} .c6{color:#ee7aae}
+
+        /* Поле ввода для зрителя */
+        .chat-input-area {
+            padding: 10px 16px; background: var(--tg-header);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+        }
+        .input-row { display: flex; gap: 8px; }
+        .chat-input {
+            flex: 1; background: var(--tg-input); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 10px 12px; border-radius: 8px; font-size: 14px; outline: none;
+        }
+        .chat-input::placeholder { color: var(--tg-hint); }
+        .send-btn {
+            background: var(--tg-accent); color: white; border: none;
+            padding: 0 16px; border-radius: 8px; font-weight: 600; cursor: pointer;
+        }
+        .nick-input {
+            width: 100%; background: var(--tg-input); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 8px 12px; border-radius: 8px; font-size: 13px; outline: none;
+        }
 
         /* Адаптив для ПК */
         @media (min-width: 768px) {
@@ -136,16 +156,14 @@
 
     <!-- ВИДЕО -->
     <div class="video-wrapper" id="videoWrap">
-        <!-- Iframe скрыт по умолчанию, src пустой -->
         <iframe id="streamFrame" allow="autoplay; camera; microphone; fullscreen"></iframe>
 
-        <!-- Заглушка с кнопкой -->
         <div class="start-overlay" id="startOverlay">
             <button class="start-btn" onclick="startStream()">▶ Смотреть трансляцию</button>
             <div class="start-hint">Нажмите для запуска видео и звука</div>
         </div>
 
-        <div class="overlay" style="opacity: 0.3;">
+        <div class="overlay" id="badges">
             <div class="badge live-badge">LIVE</div>
             <div class="badge viewers-badge">👁 <span id="viewerCount">24</span></div>
         </div>
@@ -161,56 +179,128 @@
     <div class="chat-container">
         <div class="chat-header">💬 Чат трансляции</div>
         <div class="chat-messages" id="chatBox"></div>
+        
+        <!-- Поле ввода для зрителя -->
+        <div class="chat-input-area">
+            <input type="text" class="nick-input" id="userNick" placeholder="Ваш никнейм" maxlength="15">
+            <div class="input-row">
+                <input type="text" class="chat-input" id="userMsg" placeholder="Написать сообщение..." maxlength="100">
+                <button class="send-btn" onclick="sendUserMessage()">➤</button>
+            </div>
+        </div>
     </div>
 
 <script>
     const isHost = new URLSearchParams(window.location.search).get('host') === 'true';
     if(isHost) document.getElementById('kickBtn').style.display = 'block';
 
-    // Фейковый счетчик
-    let v = 24;
+    // === СЧЕТЧИК ЗРИТЕЛЕЙ (20-60) ===
+    let v = Math.floor(Math.random() * 20) + 25;
+    document.getElementById('viewerCount').innerText = v;
+    
     setInterval(() => {
-        v += Math.floor(Math.random() * 5) - 2;
-        if(v < 20) v = 20; if(v > 35) v = 35;
+        const change = Math.floor(Math.random() * 7) - 3; 
+        v += change;
+        if(v < 20) v = 20; 
+        if(v > 60) v = 60;
         document.getElementById('viewerCount').innerText = v;
-    }, 4000);
+    }, 5000);
 
-    // Фейковый чат
-    const users = [{n:'MaxPro',c:'c1'},{n:'Dima_99',c:'c2'},{n:'Alex_K',c:'c3'},{n:'NightWolf',c:'c4'}];
-    const msgs = ['Красотка! 😍','🔥🔥🔥','Топ контент','Вау!','Лайк! 👍','Огонь!','😍','Лучшая!'];
+    // === ФЕЙКОВЫЙ ЧАТ (Боты) ===
+    const botUsers = [
+        {n:'Алексей', c:'c1'}, {n:'Дмитрий', c:'c2'}, {n:'Сергей', c:'c3'},
+        {n:'Максим', c:'c4'}, {n:'Андрей', c:'c5'}, {n:'Иван', c:'c6'},
+        {n:'Артем', c:'c1'}, {n:'Владимир', c:'c2'}, {n:'Николай', c:'c3'},
+        {n:'Павел', c:'c4'}, {n:'Егор', c:'c5'}, {n:'Михаил', c:'c6'}
+    ];
+    
+    // НОВЫЕ СООБЩЕНИЯ ПО ТВОЕМУ ЗАПРОСУ
+    const botMsgs = [
+        'Хочу в приват', 'Ответь в тг', 'Приезжай ко мне в спб',
+        'Я тебе отправил кеш', 'Проверь смс в тг', 'Напиши мне в лс',
+        'Давай в личку?', 'Жду ответа в телеге', 'Перевел тебе, глянь',
+        'Могу приехать, ты где?', 'Скинь номер карты', 'Проверь сообщения'
+    ];
 
-    function addMsg() {
+    let lastBotName = '';
+    let lastBotMsg = '';
+
+    function addBotMessage() {
         const chat = document.getElementById('chatBox');
-        const u = users[Math.floor(Math.random()*users.length)];
-        const m = msgs[Math.floor(Math.random()*msgs.length)];
+        
+        let user;
+        do {
+            user = botUsers[Math.floor(Math.random() * botUsers.length)];
+        } while (user.n === lastBotName && botUsers.length > 1);
+        lastBotName = user.n;
+
+        let msg;
+        do {
+            msg = botMsgs[Math.floor(Math.random() * botMsgs.length)];
+        } while (msg === lastBotMsg && botMsgs.length > 1);
+        lastBotMsg = msg;
+
+        renderMessage(user.n, msg, user.c);
+    }
+
+    function renderMessage(name, text, colorClass) {
+        const chat = document.getElementById('chatBox');
         const div = document.createElement('div');
         div.className = 'msg';
-        div.innerHTML = `<span class="name ${u.c}">${u.n}:</span> ${m}`;
+        div.innerHTML = `<span class="name ${colorClass}">${name}:</span> ${text}`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
-        if(chat.children.length > 50) chat.removeChild(chat.firstChild);
+        
+        if(chat.children.length > 60) chat.removeChild(chat.firstChild);
     }
-    setInterval(addMsg, Math.random()*2500+1500);
-    addMsg();
 
-    // ЗАПУСК ПОТОКА ПО КЛИКУ
+    function scheduleBotMessage() {
+        const delay = Math.random() * 4000 + 4000;
+        setTimeout(() => {
+            addBotMessage();
+            scheduleBotMessage();
+        }, delay);
+    }
+    scheduleBotMessage();
+    addBotMessage();
+
+    // === ЖИВОЙ ЧАТ ОТ ЗРИТЕЛЯ ===
+    function sendUserMessage() {
+        const nickInput = document.getElementById('userNick');
+        const msgInput = document.getElementById('userMsg');
+        
+        let nick = nickInput.value.trim();
+        const text = msgInput.value.trim();
+        
+        if(!text) return;
+        if(!nick) nick = 'Аноним';
+        
+        localStorage.setItem('stream_nick', nick);
+        
+        renderMessage(nick, text, 'c5');
+        msgInput.value = '';
+    }
+
+    window.onload = () => {
+        const savedNick = localStorage.getItem('stream_nick');
+        if(savedNick) document.getElementById('userNick').value = savedNick;
+    };
+
+    document.getElementById('userMsg').addEventListener('keypress', (e) => {
+        if(e.key === 'Enter') sendUserMessage();
+    });
+
+    // === ЗАПУСК ПОТОКА ===
     function startStream() {
-        const frame = document.getElementById('streamFrame');
+        document.getElementById('streamFrame').src = "https://vdo.ninja/?view=jihmLV5&autoplay=1&cleanoutput=1&ad=0";
+        document.getElementById('streamFrame').style.display = 'block';
         const overlay = document.getElementById('startOverlay');
-        
-        // Вставляем ссылку только сейчас -> браузер начинает грузить поток
-        frame.src = "https://vdo.ninja/?view=jihmLV5&autoplay=1&cleanoutput=1&ad=0";
-        frame.style.display = 'block';
-        
-        // Плавно скрываем заглушку
         overlay.style.opacity = '0';
         setTimeout(() => overlay.style.display = 'none', 300);
-        
-        // Делаем бейджи яркими
-        document.querySelector('.overlay').style.opacity = '1';
+        document.getElementById('badges').style.opacity = '1';
     }
 
-    // Логика кика
+    // === ЛОГИКА КИКА ===
     function endStream() {
         document.getElementById('endedScreen').style.display = 'flex';
         document.getElementById('streamFrame').style.display = 'none';

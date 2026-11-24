@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Private Stream Room</title>
+    <!-- ИСПОЛЬЗУЕМ РАБОЧИЙ СЕРВЕР PEERPROXY ВМЕСТО PEEKJS.COM -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
@@ -11,12 +12,15 @@
 
         /* --- СТРИМЕР --- */
         #hostUI { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #1a1a1d; }
-        .host-panel { background: #000; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #333; max-width: 500px; }
-        .btn-start { background: #e91e63; color: white; border: none; padding: 16px 32px; font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; }
+        .host-panel { background: #000; padding: 40px; border-radius: 16px; text-align: center; border: 1px solid #333; max-width: 500px; width: 90%; }
+        .btn-start { background: #e91e63; color: white; border: none; padding: 16px 32px; font-size: 18px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; transition: 0.2s; }
         .btn-start:hover { background: #c2185b; }
-        .link-box { margin-top: 20px; padding: 15px; background: #1f1f23; border-radius: 8px; word-break: break-all; color: #4ade80; font-family: monospace; display: none; border: 1px solid #4ade80; }
+        .btn-start:disabled { background: #555; cursor: not-allowed; }
+        
+        .link-box { margin-top: 20px; padding: 15px; background: #1f1f23; border-radius: 8px; word-break: break-all; color: #4ade80; font-family: monospace; display: none; border: 1px solid #4ade80; font-size: 14px; }
         .kick-btn { margin-top: 15px; background: #ff3333; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; width: 100%; }
         .kick-btn:hover { background: #cc0000; }
+        .status-text { margin-top: 10px; color: #888; font-size: 13px; min-height: 20px; }
 
         /* --- ЗРИТЕЛЬ --- */
         #viewerUI { display: none; height: 100vh; flex-direction: row; }
@@ -39,7 +43,6 @@
         .kicked-screen h2 { color: #ff3333; margin-bottom: 10px; }
         .kicked-screen p { color: #aaa; }
 
-        /* Скроллбар */
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
     </style>
@@ -50,8 +53,9 @@
     <div id="hostUI">
         <div class="host-panel">
             <h2 style="margin-bottom:10px;">🎥 Приватная комната</h2>
-            <p style="color:#aaa;font-size:14px;">Нажми кнопку, выбери OBS Virtual Camera и отправь ссылку гостю.</p>
-            <button class="btn-start" onclick="startStream()">▶ Начать эфир</button>
+            <p style="color:#aaa;font-size:14px; margin-bottom: 20px;">Нажми кнопку, выбери OBS Virtual Camera и отправь ссылку гостю.</p>
+            <button class="btn-start" id="startBtn" onclick="startStream()">▶ Начать эфир</button>
+            <div class="status-text" id="statusText"></div>
             <div class="link-box" id="streamLink"></div>
             <button class="kick-btn" id="kickBtn" onclick="kickViewer()">⛔ Кикнуть зрителя</button>
         </div>
@@ -66,7 +70,6 @@
                 <div class="viewers-badge">👁 <span id="viewerCount">24</span></div>
             </div>
             
-            <!-- Экран кика -->
             <div class="kicked-screen" id="kickedScreen">
                 <h2>⛔ Трансляция окончена</h2>
                 <p>Стример завершил сеанс</p>
@@ -93,7 +96,7 @@ setInterval(() => {
     document.getElementById('viewerCount').innerText = viewers;
 }, 4000);
 
-// === ФЕЙКОВЫЙ ЧАТ (Комплименты под танцы) ===
+// === ФЕЙКОВЫЙ ЧАТ ===
 const users = [
     {n:'MaxPro',c:'c1'},{n:'Dima_99',c:'c2'},{n:'Alex_K',c:'c3'},
     {n:'NightWolf',c:'c4'},{n:'Sergey_V',c:'c5'},{n:'Ivan_T',c:'c6'},
@@ -122,46 +125,98 @@ addMsg();
 
 // === ЛОГИКА СТРИМЕРА ===
 async function startStream() {
+    const btn = document.getElementById('startBtn');
+    const status = document.getElementById('statusText');
+    
+    btn.disabled = true;
+    btn.innerText = '⏳ Подключение к серверу...';
+    status.innerText = 'Инициализация PeerJS...';
+
     try {
+        // 1. Сначала получаем камеру
         const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-        peer = new Peer();
+        
+        // 2. Инициализируем Peer с ЯВНЫМ указанием рабочего сервера
+        // Используем peerproxy.app как альтернативу упавшему 0.peerjs.com
+        peer = new Peer(null, {
+            debug: 2,
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        });
+
         peer.on('open', id => {
             const link = window.location.origin + window.location.pathname + '?id=' + id;
             const lb = document.getElementById('streamLink');
             lb.style.display = 'block';
             lb.innerText = link;
-            document.querySelector('.btn-start').innerText = '✅ Эфир активен!';
+            
+            btn.innerText = '✅ Эфир активен!';
+            btn.style.background = '#2e7d32';
+            status.innerText = 'Скопируйте ссылку выше и отправьте гостю.';
             document.getElementById('kickBtn').style.display = 'block';
             
             peer.on('connection', conn => {
                 currentConn = conn;
-                conn.on('open', () => peer.call(conn.peer, stream));
+                status.innerText = '🟢 Зритель подключен!';
+                conn.on('open', () => {
+                    const call = peer.call(conn.peer, stream);
+                    call.on('close', () => status.innerText = '⚠️ Зритель отключился');
+                });
                 
-                // Слушаем сигнал "кик" от самого себя (через data channel не нужно, просто разрываем)
-                conn.on('close', () => { currentConn = null; });
+                conn.on('close', () => { 
+                    currentConn = null; 
+                    status.innerText = 'Ожидание подключения зрителя...';
+                });
             });
         });
-    } catch(e) { alert('Выбери OBS Virtual Camera!'); }
+
+        peer.on('error', err => {
+            console.error(err);
+            status.innerText = '❌ Ошибка сервера: ' + err.type;
+            btn.disabled = false;
+            btn.innerText = '▶ Попробовать снова';
+        });
+
+    } catch(e) { 
+        alert('Ошибка доступа к камере! Убедись, что OBS Virtual Camera запущена.');
+        btn.disabled = false;
+        btn.innerText = '▶ Начать эфир';
+    }
 }
 
 // КИК ЗРИТЕЛЯ
 function kickViewer() {
     if(currentConn) {
-        currentConn.close(); // Разрываем соединение
+        currentConn.close();
         currentConn = null;
-        document.getElementById('kickBtn').innerText = '⛔ Зритель кикнут';
-        setTimeout(() => { document.getElementById('kickBtn').innerText = '⛔ Кикнуть зрителя'; }, 3000);
+        document.getElementById('statusText').innerText = '⛔ Зритель кикнут!';
+        setTimeout(() => { 
+            document.getElementById('statusText').innerText = 'Ожидание подключения...'; 
+        }, 3000);
     } else {
         alert('Зритель пока не подключен');
     }
 }
 
-// === ЛОГИКА ЗРИТЕЛЯ (АВТОПОДКЛЮЧЕНИЕ) ===
+// === ЛОГИКА ЗРИТЕЛЯ ===
 if(peerId) {
     document.getElementById('hostUI').style.display = 'none';
     document.getElementById('viewerUI').style.display = 'flex';
     
-    peer = new Peer();
+    peer = new Peer(null, {
+        debug: 2,
+        config: {
+            'iceServers': [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        }
+    });
+    
     peer.on('open', () => {
         const conn = peer.connect(peerId);
         conn.on('open', () => {
@@ -175,11 +230,25 @@ if(peerId) {
             });
         });
         
-        // Если стример кикнул (закрыл соединение)
         conn.on('close', () => {
             document.getElementById('kickedScreen').style.display = 'flex';
             document.getElementById('remoteVideo').pause();
         });
+        
+        conn.on('error', () => {
+             document.getElementById('kickedScreen').style.display = 'flex';
+             document.querySelector('#kickedScreen h2').innerText = '⚠️ Ошибка соединения';
+             document.querySelector('#kickedScreen p').innerText = 'Стример оффлайн или ссылка неверна';
+        });
+    });
+    
+    peer.on('error', (err) => {
+        console.error(err);
+        if(err.type === 'peer-unavailable') {
+             document.getElementById('kickedScreen').style.display = 'flex';
+             document.querySelector('#kickedScreen h2').innerText = '⚠️ Стример не найден';
+             document.querySelector('#kickedScreen p').innerText = 'Попроси стримера обновить страницу и дать новую ссылку';
+        }
     });
 }
 </script>

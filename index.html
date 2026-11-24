@@ -3,320 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Stream</title>
+    <title>Private Stream Test</title>
     <style>
-        :root {
-            --tg-bg: #0e1621; /* Глубокий темный фон как в ТГ */
-            --tg-header: #17212b;
-            --tg-text: #ffffff;
-            --tg-hint: #708499;
-            --tg-accent: #5288c1;
-            --tg-red: #ff3b30;
-            --tg-btn: #2ea6da;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif; }
+        :root { --bg:#0e1621; --header:#17212b; --txt:#fff; --hint:#708499; --acc:#5288c1; --red:#ff3b30; --green:#4caf50; }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,'Roboto',sans-serif; }
+        body { background:var(--bg); color:var(--txt); height:100vh; overflow:hidden; display:flex; flex-direction:column; }
         
-        body { 
-            background: var(--tg-bg); 
-            color: var(--tg-text); 
-            height: 100vh; 
-            overflow: hidden; 
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* --- ВИДЕО НА ВЕСЬ ЭКРАН (БЕЗ ПОЛОС) --- */
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            background: #000;
-            flex: 1; /* Занимает все свободное место */
-            min-height: 50vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            /* object-fit: fill растягивает вертикальное видео на всю ширину */
-            object-fit: fill; 
-            display: none;
-        }
-
-        /* Заглушка старта */
-        .start-overlay {
-            position: absolute; inset: 0;
-            background: rgba(14, 22, 33, 0.9);
-            backdrop-filter: blur(15px);
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 50; transition: opacity 0.4s;
-        }
-        .start-btn {
-            background: var(--tg-btn); color: white;
-            border: none; padding: 14px 28px;
-            border-radius: 50px; font-size: 15px; font-weight: 600;
-            cursor: pointer; display: flex; align-items: center; gap: 8px;
-            box-shadow: 0 4px 20px rgba(46, 166, 218, 0.4);
-        }
-        .start-hint { margin-top: 10px; color: var(--tg-hint); font-size: 12px; }
-
-        /* Оверлеи поверх видео (LIVE и зрители) */
-        .overlay {
-            position: absolute; top: 12px; left: 12px;
-            display: flex; gap: 6px; pointer-events: none; z-index: 10;
-            opacity: 0; transition: opacity 0.5s;
-        }
-        .badge {
-            padding: 4px 8px; border-radius: 4px;
-            font-size: 12px; font-weight: 700;
-            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-            display: flex; align-items: center; gap: 4px;
-        }
-        .live-badge { background: var(--tg-red); color: white; letter-spacing: 0.5px; }
-        .viewers-badge { background: rgba(0,0,0,0.5); color: white; }
-
-        /* Кнопка кика */
-        .kick-btn {
-            position: absolute; bottom: 20px; left: 20px;
-            background: rgba(255, 59, 48, 0.9); color: white;
-            border: none; padding: 8px 16px;
-            border-radius: 20px; font-size: 12px; font-weight: 600;
-            cursor: pointer; z-index: 20;
-            display: none; backdrop-filter: blur(4px);
-        }
-
-        .ended-screen {
-            display: none; position: absolute; inset: 0;
-            background: rgba(14, 22, 33, 0.95);
-            flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100; text-align: center;
-        }
-        .ended-screen h2 { color: var(--tg-hint); font-size: 16px; }
-
-        /* --- ЧАТ (Компактный, как в мобилках) --- */
-        .chat-container {
-            height: 45%; /* Чат занимает нижнюю часть экрана */
-            background: var(--tg-bg);
-            display: flex; flex-direction: column;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            flex-shrink: 0;
-        }
-        .chat-header {
-            padding: 10px 16px; background: var(--tg-header);
-            font-size: 13px; font-weight: 600;
-            color: var(--tg-accent);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .chat-messages {
-            flex: 1; overflow-y: auto; padding: 10px 16px;
-            display: flex; flex-direction: column; gap: 6px;
-            -webkit-overflow-scrolling: touch;
-            mask-image: linear-gradient(to bottom, transparent, black 10%); /* Плавное исчезновение сверху */
-        }
-        .msg { font-size: 14px; line-height: 1.35; word-wrap: break-word; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .video-wrapper { position:relative; width:100%; background:#000; flex:1; min-height:50vh; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        iframe { width:100%; height:100%; border:none; object-fit:fill; display:none; } 
         
-        .name { font-weight: 600; margin-right: 4px; }
-        /* Цвета ников */
-        .c1{color:#ff5e5e} .c2{color:#5eff8a} .c3{color:#5eeaff} 
-        .c4{color:#ffeb5e} .c5{color:#5e9aff} .c6{color:#ff5ecf}
+        /* Экраны состояний */
+        .overlay-screen { position:absolute; inset:0; background:rgba(14,22,33,0.98); backdrop-filter:blur(20px); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:50; text-align:center; padding:20px; transition:opacity .3s; }
+        .start-btn, .pay-btn { background:var(--acc); color:white; border:none; padding:14px 28px; border-radius:50px; font-size:15px; font-weight:600; cursor:pointer; box-shadow:0 4px 20px rgba(82,136,193,.4); margin-top:15px; text-decoration:none; display:inline-block;}
+        .pay-btn { background:var(--green); }
+        .title { font-size:22px; font-weight:bold; margin-bottom:10px; }
+        .desc { color:var(--hint); font-size:14px; max-width:300px; line-height:1.5; }
+        
+        /* Бейджи */
+        .top-overlay { position:absolute; top:12px; left:12px; display:flex; gap:6px; pointer-events:none; z-index:10; opacity:0; transition:opacity .5s; }
+        .badge { padding:4px 8px; border-radius:4px; font-size:12px; font-weight:700; backdrop-filter:blur(4px); }
+        .live-badge { background:var(--red); color:white; }
+        
+        /* Чат */
+        .chat-container { height:45%; background:var(--bg); display:flex; flex-direction:column; border-top:1px solid rgba(255,255,255,.05); flex-shrink:0; }
+        .chat-header { padding:10px 16px; background:var(--header); font-size:13px; font-weight:600; color:var(--acc); border-bottom:1px solid rgba(255,255,255,.05); display:flex; justify-content:space-between; align-items:center; }
+        .chat-messages { flex:1; overflow-y:auto; padding:10px 16px; display:flex; flex-direction:column; gap:6px; mask-image:linear-gradient(to bottom,transparent,black 10%); }
+        .msg { font-size:14px; line-height:1.35; word-wrap:break-word; animation:slideUp .3s ease; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .name { font-weight:600; margin-right:4px; }
+        .c1{color:#ff5e5e} .c2{color:#5eff8a} .c3{color:#5eeaff} .c4{color:#ffeb5e} .c5{color:#5e9aff}
 
-        /* Поле ввода */
-        .chat-input-area {
-            padding: 8px 12px; background: var(--tg-header);
-            display: flex; flex-direction: column; gap: 6px;
-        }
-        .input-row { display: flex; gap: 8px; align-items: center; }
-        .chat-input {
-            flex: 1; background: var(--tg-bg); border: 1px solid rgba(255,255,255,0.1);
-            color: white; padding: 8px 12px; border-radius: 18px; font-size: 14px; outline: none;
-        }
-        .send-btn {
-            background: var(--tg-accent); color: white; border: none;
-            width: 32px; height: 32px; border-radius: 50%; 
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
-        .nick-input {
-            width: 100%; background: transparent; border: none;
-            color: var(--tg-hint); padding: 4px 12px; font-size: 12px; outline: none;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
+        .input-area { padding:8px 12px; background:var(--header); display:flex; flex-direction:column; gap:6px; }
+        .row { display:flex; gap:8px; }
+        input { background:var(--bg); border:1px solid rgba(255,255,255,.1); color:white; padding:8px 12px; border-radius:18px; font-size:14px; outline:none; }
+        .nick-in { width:100%; background:transparent; border:none; color:var(--hint); font-size:12px; border-bottom:1px solid rgba(255,255,255,.05); border-radius:0; padding:4px 12px;}
+        .send-btn { background:var(--acc); color:white; border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; }
 
-        /* Адаптив для ПК (если откроют на компе) */
-        @media (min-width: 768px) {
-            body { flex-direction: row; }
-            .video-wrapper { height: 100vh; width: 70%; max-width: 1000px; }
-            .chat-container { height: 100vh; width: 30%; min-width: 300px; max-width: 400px; border-top: none; border-left: 1px solid rgba(255,255,255,0.05); }
-            iframe { object-fit: contain; } /* На ПК лучше сохранять пропорции */
+        @media(min-width:768px){ 
+            body{flex-direction:row} 
+            .video-wrapper{height:100vh;width:70%;max-width:1000px} 
+            .chat-container{height:100vh;width:30%;min-width:300px;max-width:400px;border-top:none;border-left:1px solid rgba(255,255,255,.05)} 
+            iframe{object-fit:contain} 
         }
     </style>
 </head>
 <body>
-
-    <!-- ВИДЕО -->
-    <div class="video-wrapper" id="videoWrap">
-        <iframe id="streamFrame" allow="autoplay; camera; microphone; fullscreen"></iframe>
-
-        <div class="start-overlay" id="startOverlay">
-            <button class="start-btn" onclick="startStream()">▶ Смотреть эфир</button>
-            <div class="start-hint">Нажмите для запуска видео и звука</div>
+    <div class="video-wrapper">
+        <!-- ТВОЯ ССЫЛКА НА VDO.NINJA -->
+        <iframe id="streamFrame" src="" allow="autoplay;camera;microphone;fullscreen"></iframe>
+        
+        <!-- Экран старта -->
+        <div class="overlay-screen" id="startScreen">
+            <div class="title">🔴 Приватная трансляция</div>
+            <div class="desc">Добро пожаловать. У вас есть 30 секунд бесплатного просмотра.</div>
+            <button class="start-btn" onclick="joinStream()">▶ Войти на эфир</button>
         </div>
 
-        <div class="overlay" id="badges">
+        <!-- Экран Paywall (Блокировка) -->
+        <div class="overlay-screen" id="paywallScreen" style="display:none;">
+            <div class="title">🔒 Стример ушел в приват</div>
+            <div class="desc">Бесплатное время вышло. Для продолжения просмотра необходимо оплатить вход.</div>
+            <a href="#" class="pay-btn" onclick="simulatePayment()">💎 Оплатить вход (99₽)</a>
+        </div>
+
+        <div class="top-overlay" id="badges">
             <div class="badge live-badge">LIVE</div>
-            <div class="badge viewers-badge">👁 <span id="viewerCount">--</span></div>
-        </div>
-
-        <button class="kick-btn" id="kickBtn" onclick="endStream()">⛔ Завершить</button>
-
-        <div class="ended-screen" id="endedScreen">
-            <h2>Трансляция завершена</h2>
         </div>
     </div>
     
-    <!-- ЧАТ -->
     <div class="chat-container">
         <div class="chat-header">
-            <span>💬 Чат трансляции</span>
-            <span style="font-size:11px; opacity:0.6;">24 онлайн</span>
+            <span>💬 Чат</span>
+            <span id="timerDisplay" style="font-size:11px;opacity:0.6;"></span>
         </div>
         <div class="chat-messages" id="chatBox"></div>
-        
-        <div class="chat-input-area">
-            <input type="text" class="nick-input" id="userNick" placeholder="Ваш никнейм" maxlength="15">
-            <div class="input-row">
-                <input type="text" class="chat-input" id="userMsg" placeholder="Сообщение..." maxlength="100">
-                <button class="send-btn" onclick="sendUserMessage()">➤</button>
+        <div class="input-area">
+            <input type="text" class="nick-in" id="userNick" placeholder="Ваш никнейм" maxlength="15">
+            <div class="row">
+                <input type="text" style="flex:1" id="userMsg" placeholder="Сообщение..." maxlength="100">
+                <button class="send-btn" onclick="sendMsg()">➤</button>
             </div>
         </div>
     </div>
 
 <script>
-    const isHost = new URLSearchParams(window.location.search).get('host') === 'true';
-    if(isHost) document.getElementById('kickBtn').style.display = 'block';
-
-    // === РЕАЛИСТИЧНЫЙ СЧЕТЧИК (20-60) ===
-    let v = Math.floor(Math.random() * 15) + 25; // Старт 25-40
-    document.getElementById('viewerCount').innerText = v;
+    // КОНСТАНТЫ
+    const VDO_LINK = "https://vdo.ninja/?view=jihmLV5&autoplay=1&cleanoutput=1&ad=0";
+    const FREE_TIME = 30; // Секунды
     
-    // Меняем чаще и плавнее
-    setInterval(() => {
-        const change = Math.floor(Math.random() * 5) - 2; // -2 до +2
-        v += change;
-        if(v < 20) v = 20; 
-        if(v > 60) v = 60;
-        document.getElementById('viewerCount').innerText = v;
-    }, 3000);
-
-    // === ЖИВОЙ ХАОТИЧНЫЙ ЧАТ ===
-    const botUsers = [
-        {n:'Алексей', c:'c1'}, {n:'Дмитрий', c:'c2'}, {n:'Сергей', c:'c3'},
-        {n:'Максим', c:'c4'}, {n:'Андрей', c:'c5'}, {n:'Иван', c:'c6'},
-        {n:'Артем', c:'c1'}, {n:'Владимир', c:'c2'}, {n:'Николай', c:'c3'},
-        {n:'Павел', c:'c4'}, {n:'Егор', c:'c5'}, {n:'Михаил', c:'c6'}
-    ];
-    
-    // Смешанные сообщения: от приставаний до обычных реакций
-    const botMsgs = [
-        'Хочу в приват', 'Ответь в тг', 'Приезжай ко мне в спб',
-        'Я тебе отправил кеш', 'Проверь смс в тг', 'Напиши мне в лс',
-        'Давай в личку?', 'Жду ответа в телеге', 'Перевел тебе, глянь',
-        'Могу приехать, ты где?', 'Скинь номер карты', 'Проверь сообщения',
-        'Красотка 🔥', 'Огонь просто', 'Когда следующий эфир?', 'Лайк 👍'
-    ];
-
-    let lastBotName = '';
-    let lastBotMsg = '';
-
-    function addBotMessage() {
-        const chat = document.getElementById('chatBox');
-        
-        // Выбор без повторов
-        let user;
-        do { user = botUsers[Math.floor(Math.random() * botUsers.length)]; } 
-        while (user.n === lastBotName && botUsers.length > 1);
-        lastBotName = user.n;
-
-        let msg;
-        do { msg = botMsgs[Math.floor(Math.random() * botMsgs.length)]; } 
-        while (msg === lastBotMsg && botMsgs.length > 1);
-        lastBotMsg = msg;
-
-        renderMessage(user.n, msg, user.c);
+    let sessionId = localStorage.getItem('test_sid');
+    if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        localStorage.setItem('test_sid', sessionId);
     }
 
-    function renderMessage(name, text, colorClass) {
-        const chat = document.getElementById('chatBox');
-        const div = document.createElement('div');
-        div.className = 'msg';
-        div.innerHTML = `<span class="name ${colorClass}">${name}:</span> ${text}`;
-        chat.appendChild(div);
-        chat.scrollTop = chat.scrollHeight;
-        
-        if(chat.children.length > 40) chat.removeChild(chat.firstChild);
-    }
-
-    // Рандомная скорость сообщений (от 2 до 6 секунд)
-    function scheduleBotMessage() {
-        const delay = Math.random() * 4000 + 2000;
-        setTimeout(() => {
-            addBotMessage();
-            scheduleBotMessage();
-        }, delay);
-    }
-    scheduleBotMessage();
-    addBotMessage();
-
-    // === ВВОД ОТ ЗРИТЕЛЯ ===
-    function sendUserMessage() {
-        const nickInput = document.getElementById('userNick');
-        const msgInput = document.getElementById('userMsg');
-        
-        let nick = nickInput.value.trim();
-        const text = msgInput.value.trim();
-        
-        if(!text) return;
-        if(!nick) nick = 'Аноним';
-        
-        localStorage.setItem('stream_nick', nick);
-        renderMessage(nick, text, 'c5');
-        msgInput.value = '';
-    }
-
+    // Проверка статуса при загрузке
     window.onload = () => {
-        const savedNick = localStorage.getItem('stream_nick');
+        const status = localStorage.getItem('test_status');
+        if (status === 'blocked') {
+            showPaywall();
+        } else if (status === 'paid') {
+            unlockStream();
+        } else {
+            document.getElementById('startScreen').style.display = 'flex';
+        }
+        runBots();
+        
+        // Восстановление ника
+        const savedNick = localStorage.getItem('test_nick');
         if(savedNick) document.getElementById('userNick').value = savedNick;
     };
 
-    document.getElementById('userMsg').addEventListener('keypress', (e) => {
-        if(e.key === 'Enter') sendUserMessage();
-    });
+    function joinStream() {
+        document.getElementById('startScreen').style.display = 'none';
+        startVideo();
+        startTimer(FREE_TIME);
+    }
 
-    // === ЗАПУСК ПОТОКА ===
-    function startStream() {
-        document.getElementById('streamFrame').src = "https://vdo.ninja/?view=jihmLV5&autoplay=1&cleanoutput=1&ad=0";
-        document.getElementById('streamFrame').style.display = 'block';
-        const overlay = document.getElementById('startOverlay');
-        overlay.style.opacity = '0';
-        setTimeout(() => overlay.style.display = 'none', 400);
+    function startVideo() {
+        const f = document.getElementById('streamFrame');
+        f.src = VDO_LINK;
+        f.style.display = 'block';
         document.getElementById('badges').style.opacity = '1';
     }
 
-    // === КИК ===
-    function endStream() {
-        document.getElementById('endedScreen').style.display = 'flex';
+    function startTimer(sec) {
+        let s = sec;
+        const el = document.getElementById('timerDisplay');
+        const int = setInterval(() => {
+            s--; 
+            el.innerText = `Осталось: ${s}с`;
+            if(s <= 0) { 
+                clearInterval(int); 
+                el.innerText = ''; 
+                lockStream(); 
+            }
+        }, 1000);
+    }
+
+    function lockStream() {
         document.getElementById('streamFrame').style.display = 'none';
-        const btn = document.getElementById('kickBtn');
-        btn.innerText = '✅ Завершено';
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
+        document.getElementById('paywallScreen').style.display = 'flex';
+        localStorage.setItem('test_status', 'blocked');
+    }
+
+    function showPaywall() {
+        document.getElementById('streamFrame').style.display = 'none';
+        document.getElementById('paywallScreen').style.display = 'flex';
+        document.getElementById('badges').style.opacity = '0.3';
+    }
+
+    // Имитация оплаты для теста
+    function simulatePayment() {
+        if(confirm('Тестовый режим: Имитировать успешную оплату?')) {
+            localStorage.setItem('test_status', 'paid');
+            unlockStream();
+            render('Система', '💎 Доступ успешно активирован!', 'c4');
+        }
+    }
+
+    function unlockStream() {
+        document.getElementById('paywallScreen').style.display = 'none';
+        document.getElementById('streamFrame').style.display = 'block';
+        document.getElementById('badges').style.opacity = '1';
+        document.getElementById('timerDisplay').innerText = '✅ Доступ активен';
+        if(!document.getElementById('streamFrame').src) startVideo();
+    }
+
+    // Чат и боты
+    const bots = [{n:'Алексей',c:'c1'},{n:'Дмитрий',c:'c2'},{n:'Сергей',c:'c3'}];
+    const msgs = ['Хочу в приват','Ответь в тг','Приезжай ко мне в спб','Я тебе отправил кеш','Проверь смс в тг'];
+    
+    function runBots() {
+        setTimeout(()=>{
+            const b = bots[Math.floor(Math.random()*bots.length)];
+            const m = msgs[Math.floor(Math.random()*msgs.length)];
+            render(b.n, m, b.c);
+            runBots();
+        }, Math.random()*4000+2000);
+    }
+
+    function sendMsg() {
+        const n = document.getElementById('userNick').value.trim() || 'Аноним';
+        const t = document.getElementById('userMsg').value.trim();
+        if(!t) return;
+        localStorage.setItem('test_nick', n);
+        render(n, t, 'c5');
+        document.getElementById('userMsg').value = '';
+    }
+    document.getElementById('userMsg').onkeypress = e => { if(e.key==='Enter') sendMsg(); };
+
+    function render(n,t,c) {
+        const d = document.createElement('div'); d.className='msg';
+        d.innerHTML = `<span class="name ${c}">${n}:</span> ${t}`;
+        const box = document.getElementById('chatBox'); box.appendChild(d); box.scrollTop=box.scrollHeight;
+        if(box.children.length>50) box.removeChild(box.firstChild);
     }
 </script>
 </body>
